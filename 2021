@@ -1,0 +1,138 @@
+@echo off
+title Activate Microsoft Office 2021 (ALL versions) for FREE&cls
+echo =====================================================================================
+echo #Project: Activating Microsoft Office 2021 for FREE
+echo =====================================================================================
+echo.
+
+setlocal enabledelayedexpansion
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+	echo [!] Requesting admin privileges...
+	powershell -c "saps '%~f0' -verb runas" >nul 2>&1
+	if !errorlevel! neq 0 (
+		echo [X] You declined admin access.
+		goto halt
+	)
+	exit /b
+)
+echo [✓] Running as admin.
+echo.
+
+echo [*] Checking Office installation...
+if exist "%ProgramFiles%\Microsoft Office\Office16\ospp.vbs" (
+	cd /d "%ProgramFiles%\Microsoft Office\Office16"
+	echo [✓] Office16 found in Program Files
+) else if exist "%ProgramFiles(x86)%\Microsoft Office\Office16\ospp.vbs" (
+	cd /d "%ProgramFiles(x86)%\Microsoft Office\Office16"
+	echo [✓] Office16 found in Program Files (x86)
+) else (
+	echo [X] Office16 is not installed!
+	goto halt
+)
+echo.
+
+echo [*] Checking Office version...
+reg query "HKLM\SOFTWARE\Microsoft\Office\16.0" /v ProductReleaseIds 2>nul | find "ProPlus" >nul
+if !errorlevel! neq 0 (
+	echo [X] Office version is not ProPlus 2021!
+	echo [X] This script only works with ProPlus 2021 or Professional Plus 2021
+	goto notsupported
+)
+echo [✓] ProPlus 2021 detected!
+echo.
+
+echo [*] Installing license files...
+for /f "delims=" %%x in ('dir /b ..\root\Licenses16\ProPlus2021VL_KMS*.xrm-ms 2^>nul') do (
+	cscript //nologo ospp.vbs /inslic:"..\root\Licenses16\%%x" >nul 2>&1
+	if !errorlevel! EQU 0 (
+		echo [✓] License file installed: %%x
+	) else (
+		echo [!] Warning: Could not install license %%x
+	)
+)
+echo.
+
+echo =====================================================================================
+echo Activating your product...
+echo =====================================================================================
+echo.
+
+echo [*] Setting KMS port...
+cscript //nologo ospp.vbs /setprt:1688 >nul 2>&1
+if !errorlevel! neq 0 (
+	echo [!] Warning: Could not set KMS port
+)
+
+echo [*] Removing old product key...
+cscript //nologo ospp.vbs /unpkey:6F7TH >nul 2>&1
+
+echo [*] Installing new product key...
+cscript //nologo ospp.vbs /inpkey:FXYTK-NJJ8C-GB6DW-3DYQT-6F7TH >nul 2>&1
+if !errorlevel! neq 0 (
+	echo [X] Failed to install product key!
+	goto notsupported
+)
+echo [✓] Product key installed!
+echo.
+
+set i=1
+:retry
+if !i! GTR 10 goto busy
+if !i! EQU 1 (
+	set KMS=kms7.MSGuides.com
+	echo [*] Attempt !i!/10: Trying primary KMS server (!KMS!)...
+) else if !i! EQU 2 (
+	set KMS=209.209.9.214
+	echo [*] Attempt !i!/10: Trying backup KMS server (!KMS!)...
+) else (
+	echo [*] Attempt !i!/10: Retrying backup server (!KMS!)...
+)
+
+cscript //nologo ospp.vbs /sethst:!KMS! >nul 2>&1
+if !errorlevel! neq 0 (
+	echo [X] Could not connect to !KMS!
+	set /a i+=1
+	goto retry
+)
+
+cscript //nologo ospp.vbs /act 2>nul | find /i "successful" >nul
+if !errorlevel! EQU 0 goto success
+
+echo [X] Activation failed on !KMS!
+set /a i+=1
+goto retry
+
+:success
+echo.
+echo =====================================================================================
+echo [✓] ACTIVATION SUCCESSFUL!
+echo =====================================================================================
+echo.
+echo #Your support is helping keep servers running 24/7!
+echo #Blog: MSGuides.com
+echo #Support: donate.msguides.com
+echo #Contact: msguides.com@gmail.com
+echo.
+echo =====================================================================================
+choice /n /c YN /m "Would you like to visit the blog [Y,N]?"
+if !errorlevel! EQU 1 start "http://MSGuides.com"
+goto halt
+
+:notsupported
+echo =====================================================================================
+echo [X] Sorry, your Office version is not supported.
+echo [X] This script requires: Microsoft Office ProPlus 2021
+echo =====================================================================================
+goto halt
+
+:busy
+echo =====================================================================================
+echo [X] All KMS servers are busy. Please try again later.
+echo =====================================================================================
+goto halt
+
+:halt
+echo.
+pause >nul
+endlocal
